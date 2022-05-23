@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def compute_coverage_len(y_test, y_lower, y_upper, verbose=False):
+def compute_coverage_len(y_test, y_lower, y_upper, verbose=False, eta=30, mu=0.9):
     """ 
     Compute average coverage and length of prediction intervals
     """
@@ -9,10 +9,11 @@ def compute_coverage_len(y_test, y_lower, y_upper, verbose=False):
     coverage = in_the_range / np.prod(y_test.shape)
     avg_length = np.mean(abs(y_upper - y_lower))
     avg_length = avg_length/(y_test.max()-y_test.min())
+    cwc = (1-avg_length)*np.exp(-eta*(coverage-mu)**2)
     if verbose==True:
-        print(f"PI coverage: {coverage*100:.1f}%, PI avg. length: {avg_length:.3f}")
+        print(f"PI coverage: {coverage*100:.1f}%, PI avg. length: {avg_length:.3f}, CWC: {cwc:.3f}")
     else:
-        return coverage, avg_length
+        return coverage, avg_length, cwc
 
 
 def asym_nonconformity(label, low, high):
