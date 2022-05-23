@@ -3,7 +3,9 @@ EnCQR allows to generate accurate prediction intervals when predicting a time se
 
 ---
 ### Example of usage
-This [notebook](https://github.com/FilippoMB/Ensemble-Conformalized-Quantile-Regression/blob/main/example.ipynb) shows an example of how to generate PIs with EnCQR using an LSTM, a Temporal Convolutional Network, or Random Forest regression as the base models.
+The code in [main_EnCQR.py](https://github.com/FilippoMB/Ensemble-Conformalized-Quantile-Regression/blob/main/main_EnCQR.py) shows a quick example of how to perform probabilistic forecasting with EnCQR.
+
+For a more detailed explanation, take a look at this [notebook](https://github.com/FilippoMB/Ensemble-Conformalized-Quantile-Regression/blob/main/example.ipynb), which shows how to use different regression models (LSTM, Temporal Convolutional Network, and Random Forest) as the base models in the ensemble and how the dataset are preprocessed.
 
 ----
 ### Citation
