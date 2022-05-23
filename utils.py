@@ -11,17 +11,16 @@ def compute_coverage_len(y_test, y_lower, y_upper, verbose=False):
     avg_length = avg_length/(y_test.max()-y_test.min())
     if verbose==True:
         print(f"PI coverage: {coverage*100:.1f}%, PI avg. length: {avg_length:.3f}")
-    return coverage, avg_length
+    else:
+        return coverage, avg_length
 
 
-def asym_nonconformity(label,low,high):
+def asym_nonconformity(label, low, high):
     """
     Compute the asymetric conformity score
     """
-    y_lower = low
-    y_upper = high
-    error_high = label - y_upper 
-    error_low = y_lower - label
+    error_high = label - high 
+    error_low = low - label
     return error_low, error_high
 
 
@@ -98,6 +97,7 @@ def plot_history(history):
     axs[2].plot(hist_dict['val_pi_len'], label='val_pi_len', color=plt.cm.tab10(1), linestyle='dashed')
     axs[2].legend()
     
-    
+    plt.tight_layout()
+    plt.show()
     
     

@@ -49,17 +49,17 @@ def EnCQR(train_data, val_x, val_y, test_x, test_y, P):
         f_hat_b_agg_high[:,:,b] = np.mean(dct_hi['pred_%s' %b],axis=0)  
         
     # residuals on the training data
-    epsilon = []
+    epsilon_low = []
     epsilon_hi=[]
     for b in range(P['B']):
-        e_low,e_high = utils.asym_nonconformity(label=train_data[b][1], 
+        e_low, e_high = utils.asym_nonconformity(label=train_data[b][1], 
                                                   low=f_hat_b_agg_low[:,:,b], 
                                                   high=f_hat_b_agg_high[:,:,b])
-        epsilon.append(e_low)
+        epsilon_low.append(e_low)
         epsilon_hi.append(e_high)
-    epsilon = np.array(epsilon).flatten()
+    epsilon_low = np.array(epsilon_low).flatten()
     epsilon_hi = np.array(epsilon_hi).flatten()
-    
+            
     # Construct PIs for test data
     f_hat_t_batch = np.zeros((test_y.shape[0], test_y.shape[1], 3, P['B']))
     for b, model_b in enumerate(ensemble_models):
@@ -70,8 +70,7 @@ def EnCQR(train_data, val_x, val_y, test_x, test_y, P):
     conf_PI = np.zeros((test_y.shape[0], test_y.shape[1], 3))
     conf_PI[:,:,1] = PI[:,:,1]
     for i in range(test_y.shape[0]):   
-    
-        e_quantile_lo = np.quantile(epsilon, 1-P['alpha']/2)
+        e_quantile_lo = np.quantile(epsilon_low, 1-P['alpha']/2)
         e_quantile_hi = np.quantile(epsilon_hi, 1-P['alpha']/2)
         conf_PI[i,:,0] = PI[i,:,0] - e_quantile_lo
         conf_PI[i,:,2] = PI[i,:,2] + e_quantile_hi
@@ -80,9 +79,9 @@ def EnCQR(train_data, val_x, val_y, test_x, test_y, P):
         e_lo, e_hi = utils.asym_nonconformity(label=test_y[i,:],
                                                 low=PI[i,:,0],
                                                 high=PI[i,:,2])
-        epsilon = np.delete(epsilon,slice(0,s,1))
+        epsilon_low = np.delete(epsilon_low,slice(0,s,1))
         epsilon_hi = np.delete(epsilon_hi,slice(0,s,1))
-        epsilon = np.append(epsilon, e_lo)
+        epsilon_low = np.append(epsilon_low, e_lo)
         epsilon_hi = np.append(epsilon_hi, e_hi)
         
     return PI, conf_PI

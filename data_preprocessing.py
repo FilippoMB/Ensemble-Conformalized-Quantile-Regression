@@ -1,100 +1,101 @@
 import numpy as np
-import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
 
-def transform_to_windows(data_org, key_id):
-    """
-    Create dataframe with hours as columns 
-    """
-    #from the original datetime index create new columns with each of the year, month, day, and hour.
-    data = data_org.copy()
-    data.loc[:,'year'] = data.index.year
-    data.loc[:,'month'] = data.index.month
-    data.loc[:,'day'] = data.index.day
-    data.loc[:,'hours'] = data.index.hour
-    #construct datetimes from the split year, month, day columns
-    data.loc[:,'date'] = pd.to_datetime(data.loc[:,['year', 'month', 'day']], format='%Y-%m-%d', errors='ignore')
-    #set the index to dates only
-    data = data.set_index(pd.DatetimeIndex(data['date']))
-    #drop non target columns 
-    data = data.loc[:,[key_id, 'hours']]
-    #pivot the table into the format Date h0, h1, ...h23
-    data = data.pivot(columns='hours', values=key_id)
-    data = data.fillna(value=0) # data.dropna()
-    if data.shape[0] > int(np.ceil(data_org.shape[0]/24)):
-        data.drop(data.tail(1).index,inplace=True)
-    return data
-
-
-def split_sequences(sequences, n_steps):
-    """
-    Split data into observations and labels 
-
-    source: https://github.com/nicholasjhana/short-term-energy-demand-forecasting
-    """
-    max_step=n_steps
-    n_steps+=1
-    X, y = list(), list()
-    for i in range(len(sequences)):
-        # find the end of this pattern
-        end_ix = i + max_step
-        #create a list with the indexes we want to include in each sample
-        slices = [x for x in range(end_ix-1,end_ix-n_steps, -1)] + [y for y in range(end_ix-n_steps, i, -7)]
-        #reverse the slice indexes
-        slices = list(reversed(slices))
-        # check if we are beyond the dataset
-        if end_ix > len(sequences)-1:
-            break
-        # gather input and output parts of the pattern
-        seq_x = sequences[slices, :]
-        seq_y = sequences[end_ix, :]
-        X.append(seq_x)
-        y.append(seq_y)
-    X = np.array(X)
-    X = np.reshape(X,(X.shape[0],X.shape[1]*X.shape[2],1))
-    y = np.array(y)
-    return X, y
-
-
-def _df_to_sequence(data, target_idx=[0]):
-    X_list = []
-    Y_list = []
-    for i,s in enumerate(data.columns): 
-        x, y = split_sequences(transform_to_windows(data, key_id=s).values,7)
-        if i in target_idx:
-            Y_list.append(y)
-        X_list.append(x)
-    X = np.stack(X_list, axis=2).squeeze().astype(np.float32)
-    Y = np.stack(Y_list, axis=2).squeeze().astype(np.float32)
-    return X, Y
-
-
-def create_datasets(data, target_idx=0, scaler=None, B=None):
-    """
-    Create input-output pairs from a dataframe with observations
+class WindowGenerator():
+  
+    def __init__(self, input_width, label_width, shift, df, label_columns=None):
     
-    target_idx specifies the index of the variable to predict
-    """
+        # Work out the label column indices.
+        self.label_columns = label_columns
+        if label_columns is not None:
+          self.label_columns_indices = {name: i for i, name in
+                                        enumerate(label_columns)}
+        self.column_indices = {name: i for i, name in enumerate(df.columns)}
+    
+        # Work out the window parameters.
+        self.input_width = input_width
+        self.label_width = label_width
+        self.shift = shift
+    
+        self.total_window_size = input_width + shift
+    
+        self.input_slice = slice(0, input_width)
+        self.input_indices = np.arange(self.total_window_size)[self.input_slice]
+    
+        self.label_start = self.total_window_size - self.label_width
+        self.labels_slice = slice(self.label_start, None)
+        self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
+    
+    def split_window(self, features):
+        inputs = features[:, self.input_slice, :]
+        labels = features[:, self.labels_slice, :]
+        if self.label_columns is not None:
+            labels = np.stack(
+                [labels[:, :, self.column_indices[name]] for name in self.label_columns],
+                axis=-1)
+            
+        return inputs, labels
+    
 
-    if B is None:
-        X, Y = _df_to_sequence(data, target_idx=target_idx)
-        if scaler is not None:
-            X = scaler.transform_x(X)
-            Y = scaler.transform_y(Y)
-        return X, Y
-        
+def data_windowing(df, B, time_steps_in, time_steps_out, shift=None, label_columns=None, train_len=.8, val_len=.1, val_data=None, test_data=None):
+    
+    if shift is None:
+        shift=time_steps_out
+    
+    win = WindowGenerator(
+        input_width=time_steps_in, 
+        label_width=time_steps_out, 
+        shift=shift,
+        df=df,
+        label_columns=label_columns)
+    
+    # Split the data, if the val and test set are not given
+    if val_data is None and test_data is None:
+        assert(train_len+val_len < 1)
+        N = df.shape[0]
+        train_data = np.array(df[:int(N*train_len)].values).astype(np.float32)
+        val_data = np.array(df[int(N*train_len):int(N*(train_len+val_len))].values).astype(np.float32)
+        test_data = np.array(df[int(N*(train_len+val_len)):].values).astype(np.float32)
     else:
-        ensemble_data = []
-        for i in range(B):
-            sb_size = int(np.floor(data.shape[0]/B))
-            data_i = data[i*sb_size:i*sb_size+sb_size]
-            X_i, Y_i = _df_to_sequence(data_i, target_idx=target_idx)
-            if scaler is not None:
-                X_i = scaler.transform_x(X_i)
-                Y_i = scaler.transform_y(Y_i)
-            ensemble_data.append([X_i, Y_i])
-        return ensemble_data
+        train_data = np.array(df.values).astype(np.float32)
+        val_data = np.array(val_data.values).astype(np.float32)
+        test_data = np.array(test_data.values).astype(np.float32)
+        
+    # Initialize scaler
+    scaler = xy_scaler()
+    y_index = [df.columns.get_loc(col) for col in label_columns]
+    scaler.fit(train_data, y_index)
+    
+    # Make windows
+    train_window = np.stack([ train_data[i:i+win.total_window_size] for i in range(0, train_data.shape[0] - win.total_window_size, time_steps_out)])
+    train_x, train_y = win.split_window(train_window)
+    train_y = train_y[:,:,0]
+    
+    val_window = np.stack([ val_data[i:i+win.total_window_size] for i in range(0, val_data.shape[0] - win.total_window_size, time_steps_out)])
+    val_x, val_y = win.split_window(val_window)
+    val_y = val_y[:,:,0]
+    
+    test_window = np.stack([ test_data[i:i+win.total_window_size] for i in range(0, test_data.shape[0] - win.total_window_size, time_steps_out)])
+    test_x, test_y = win.split_window(test_window)
+    test_y = test_y[:,:,0]
+
+    
+    # Rescale data
+    train_x = scaler.transform_x(train_x)
+    train_y = scaler.transform_y(train_y)
+    val_x = scaler.transform_x(val_x)
+    val_y = scaler.transform_y(val_y)
+    test_x = scaler.transform_x(test_x)
+    test_y = scaler.transform_y(test_y)
+    
+    # Make training batches
+    batch_len = int(np.floor(train_x.shape[0]/B))
+    train_data = []
+    for b in range(B):
+        train_data.append([train_x[b*batch_len:(b+1)*batch_len], train_y[b*batch_len:(b+1)*batch_len]])
+        
+    return train_data, val_x, val_y, test_x, test_y, scaler
             
 
 class xy_scaler:
@@ -127,15 +128,13 @@ class xy_scaler:
         data_r = data.reshape(data.shape[0]*data.shape[1], -1)
         data_r = self.x_scaler.transform(data_r)
         data = data_r.reshape(data.shape[0], data.shape[1], -1)
-        return data.squeeze()
+        return data
     
     def transform_y(self, data):
-        if len(data.shape) == 2:
-            data = data[..., None]
-        data_r = data.reshape(data.shape[0]*data.shape[1], -1)
+        data_r = data.reshape(data.shape[0]*data.shape[1], 1)
         data_r = self.y_scaler.transform(data_r)
-        data = data_r.reshape(data.shape[0], data.shape[1], -1)
-        return data.squeeze()
+        data = data_r.reshape(data.shape[0], data.shape[1])
+        return data
         
     def inverse_transform_x(self, data):
         if len(data.shape) == 2:
@@ -143,14 +142,10 @@ class xy_scaler:
         data_r = data.reshape(data.shape[0]*data.shape[1], -1)
         data_r = self.x_scaler.inverse_transform(data_r)
         data = data_r.reshape(data.shape[0], data.shape[1], -1)
-        return data.squeeze()
+        return data
     
     def inverse_transform_y(self, data):
-        if len(data.shape) == 2:
-            data = data[..., None]
-        data_r = data.reshape(data.shape[0]*data.shape[1], -1)
+        data_r = data.reshape(data.shape[0]*data.shape[1], 1)
         data_r = self.y_scaler.inverse_transform(data_r)
-        data = data_r.reshape(data.shape[0], data.shape[1], -1)
-        return data.squeeze()
-             
-    
+        data = data_r.reshape(data.shape[0], data.shape[1])
+        return data
