@@ -6,7 +6,7 @@ import data_loaders
 
 ############### Hyperparameters
 target_idx = [0]            # target variables to predict
-B = 3                       # number of ensembles
+B = 3                       # size of the ensemble
 alpha = 0.1                 # confidence level            
 quantiles = [alpha/2,       # quantiles to predict
              0.5,
@@ -33,7 +33,6 @@ P['time_steps_out'] = test_y.shape[1]
 
 
 ############ Compute PI with EnCQR
-P['model_type'] = 'rf'
 PI, conf_PI = EnCQR(train_data, val_x, val_y, test_x, test_y, P)
 
 utils.plot_PIs(test_y, PI[:,:,1],
