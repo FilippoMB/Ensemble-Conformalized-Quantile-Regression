@@ -80,7 +80,6 @@ def data_windowing(df, B, time_steps_in, time_steps_out, shift=None, label_colum
     test_x, test_y = win.split_window(test_window)
     test_y = test_y[:,:,0]
 
-    
     # Rescale data
     train_x = scaler.transform_x(train_x)
     train_y = scaler.transform_y(train_y)
@@ -91,9 +90,10 @@ def data_windowing(df, B, time_steps_in, time_steps_out, shift=None, label_colum
     
     # Make training batches
     batch_len = int(np.floor(train_x.shape[0]/B))
+    to_del = time_steps_in//time_steps_out # make sure there are no overlapping windows across batches
     train_data = []
     for b in range(B):
-        train_data.append([train_x[b*batch_len:(b+1)*batch_len], train_y[b*batch_len:(b+1)*batch_len]])
+        train_data.append([train_x[b*batch_len:(b+1)*batch_len-to_del], train_y[b*batch_len:(b+1)*batch_len-to_del]])
         
     return train_data, val_x, val_y, test_x, test_y, scaler
             
