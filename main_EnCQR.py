@@ -5,7 +5,6 @@ import data_loaders
 
 
 ############### Hyperparameters
-target_idx = [0]            # target variables to predict
 B = 3                       # size of the ensemble
 alpha = 0.1                 # confidence level            
 quantiles = [alpha/2,       # quantiles to predict
