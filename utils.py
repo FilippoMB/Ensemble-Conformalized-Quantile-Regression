@@ -27,7 +27,8 @@ def asym_nonconformity(label, low, high):
 
 def plot_PIs(true, pred_mean, PI_low=None, PI_hi=None, 
              conf_PI_low=None, conf_PI_hi=None, 
-             x_lims=None, scaler=None, title=None):
+             x_lims=None, scaler=None, title=None,
+             label_pi=None):
     
     if scaler:
         true = scaler.inverse_transform_y(true)
@@ -39,7 +40,7 @@ def plot_PIs(true, pred_mean, PI_low=None, PI_hi=None,
     plt.cm.tab20(0)
     plt.figure(figsize=(12, 3.5))
     plt.plot(np.arange(true.shape[0]), true, label='True', color='k')
-    plt.plot(pred_mean, label='0.5', color=plt.cm.tab10(1))
+    plt.plot(pred_mean, label='Pred', color=plt.cm.tab10(1))
     
     if conf_PI_low is not None:
         
@@ -61,9 +62,11 @@ def plot_PIs(true, pred_mean, PI_low=None, PI_hi=None,
             PI_low = scaler.inverse_transform_y(PI_low)
             PI_hi = scaler.inverse_transform_y(PI_hi)
             
+        if label_pi is None:
+            label_pi = 'PI'
         PI_hi = PI_hi.flatten()
         PI_low = PI_low.flatten()  
-        plt.fill_between(np.arange(true.shape[0]), PI_low, PI_hi, alpha=0.3, label='PI')
+        plt.fill_between(np.arange(true.shape[0]), PI_low, PI_hi, alpha=0.3, label=label_pi)
         
     if x_lims is not None:
         plt.xlim(x_lims)
